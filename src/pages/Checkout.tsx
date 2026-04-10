@@ -1,436 +1,389 @@
-import React, { useState, useRef } from 'react';
-import { CreditCard, Smartphone, Barcode, Shield, Lock, MessageCircle, ShoppingCart } from 'lucide-react';
-import { useCart } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ArrowLeft, MessageCircle, Plus, Minus, ShieldCheck, Lock, Check } from 'lucide-react'
+import type { Produto } from './Home'
+
+interface FormData {
+  nome: string
+  telefone: string
+  email: string
+  endereco: string
+  complemento: string
+  cidade: string
+  estado: string
+  quantidade: number
+  corSelecionada: string
+  observacoes: string
+}
+
+const UFS = [
+  'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT',
+  'PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO',
+]
 
 export default function Checkout() {
-  const { carrinho, totalPreco, limparCarrinho } = useCart();
-  const { user } = useAuth();
-  const [formaPagamento, setFormaPagamento] = useState<'cartao' | 'pix' | 'boleto'>('cartao');
-  const [parcelas, setParcelas] = useState(1);
-  const [pedidoFinalizado, setPedidoFinalizado] = useState(false);
-  const [codigoPedido, setCodigoPedido] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  
-  const codigoGerado = useRef(false);
+  const location = useLocation()
+  const navigate = useNavigate()
+  const produto = location.state?.produto as Produto | undefined
 
-  const handleFinalizarPedido = () => {
-    setLoading(true);
-    
-    setTimeout(() => {
-      if (formaPagamento === 'boleto' && parcelas > 1) {
-        const numeroWhatsapp = '5511999999999';
-        const mensagem = `Olá! Gostaria de finalizar meu pedido via boleto parcelado. Total: R$ ${totalPreco.toFixed(2)} em ${parcelas}x`;
-        window.open(`https://wa.me/${numeroWhatsapp}?text=${encodeURIComponent(mensagem)}`, '_blank');
-        setLoading(false);
-      } else {
-        if (!codigoPedido && !codigoGerado.current) {
-          const novoCodigo = Math.random().toString(36).substr(2, 9).toUpperCase();
-          setCodigoPedido(novoCodigo);
-          codigoGerado.current = true;
-        }
-        
-        setTimeout(() => {
-          setPedidoFinalizado(true);
-          limparCarrinho();
-          setLoading(false);
-        }, 100);
-      }
-    }, 1500);
-  };
+  const [form, setForm] = useState<FormData>({
+    nome: '',
+    telefone: '',
+    email: '',
+    endereco: '',
+    complemento: '',
+    cidade: '',
+    estado: '',
+    quantidade: 1,
+    corSelecionada: produto?.cores[0].hex ?? '',
+    observacoes: '',
+  })
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
+  const [enviado, setEnviado] = useState(false)
 
-  if (pedidoFinalizado) {
+  /* ── Produto não encontrado ── */
+  if (!produto) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center py-12 px-4">
-        <div className="max-w-md w-full text-center">
-          <div className="mb-6">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <Shield className="h-10 w-10 text-green-600" />
-            </div>
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Pedido Confirmado!</h2>
-          <p className="text-gray-600 mb-6">
-            Seu pedido foi realizado com sucesso. Em breve você receberá a confirmação por e-mail.
-          </p>
-          {codigoPedido && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
-              <p className="text-green-800 font-medium text-lg">
-                Código do pedido: <span className="font-bold">#{codigoPedido}</span>
-              </p>
-              <p className="text-green-700 text-sm mt-2">
-                Guarde este código para consultar seu pedido
-              </p>
-            </div>
-          )}
-          <div className="space-y-3">
-            <a
-              href="/"
-              className="block w-full bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-medium py-3 px-4 rounded-lg"
-            >
-              Voltar para a loja
-            </a>
-            <a
-              href="/produtos"
-              className="block w-full border border-[#1e40af] text-[#1e40af] hover:bg-blue-50 font-medium py-3 px-4 rounded-lg"
-            >
-              Continuar comprando
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (carrinho.length === 0) {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center">
+      <div className="min-h-[70vh] flex items-center justify-center bg-gray-950 px-6">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShoppingCart className="h-8 w-8 text-gray-400" />
+          <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock size={32} className="text-gray-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Carrinho vazio</h2>
-          <p className="text-gray-600 mb-8">Adicione produtos ao carrinho antes de finalizar a compra.</p>
-          <a
-            href="/produtos"
-            className="inline-block bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-medium py-3 px-6 rounded-lg"
+          <h2 className="text-2xl font-bold text-gray-400 mb-3">Nenhum produto selecionado</h2>
+          <p className="text-gray-600 mb-8">Escolha um produto na página inicial para continuar.</p>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3 rounded-xl transition"
           >
             Ver produtos
-          </a>
+          </button>
         </div>
       </div>
-    );
+    )
   }
 
-  return (
-    <div className="py-12">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center mb-8">
-          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-            <Lock className="h-5 w-5 text-[#1e40af]" />
+  const totalPreco = produto.preco * form.quantidade
+
+  /* ── Handlers ── */
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+    if (errors[name as keyof FormData]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }))
+    }
+  }
+
+  const validate = () => {
+    const e: Partial<Record<keyof FormData, string>> = {}
+    if (!form.nome.trim())     e.nome     = 'Campo obrigatório'
+    if (!form.telefone.trim()) e.telefone = 'Campo obrigatório'
+    if (!form.email.trim())    e.email    = 'Campo obrigatório'
+    if (!form.endereco.trim()) e.endereco = 'Campo obrigatório'
+    if (!form.cidade.trim())   e.cidade   = 'Campo obrigatório'
+    if (!form.estado)          e.estado   = 'Selecione um estado'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleEnviar = () => {
+    if (!validate()) return
+
+    const cor = produto.cores.find(c => c.hex === form.corSelecionada)
+
+    const mensagem = `
+🔐 *Novo Pedido — Fechaduras Hoteleiras*
+
+*Produto:* ${produto.nome}
+*Cor:* ${cor?.nome ?? form.corSelecionada}
+*Quantidade:* ${form.quantidade}
+*Total:* R$ ${totalPreco.toFixed(2)}
+
+👤 *Cliente*
+*Nome:* ${form.nome}
+*Telefone:* ${form.telefone}
+*E-mail:* ${form.email}
+
+📍 *Endereço de Entrega*
+${form.endereco}${form.complemento ? `, ${form.complemento}` : ''}
+${form.cidade} — ${form.estado}
+${form.observacoes ? `\n📝 *Observações:* ${form.observacoes}` : ''}
+    `.trim()
+
+    // ⚠️ Troque pelo número real com DDI + DDD (sem espaços ou símbolos)
+    const numero = '5511995778307'
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`, '_blank')
+    setEnviado(true)
+  }
+
+  const ic = (err: boolean) =>
+    `w-full bg-gray-800 border ${err ? 'border-red-500' : 'border-gray-700'} ` +
+    `text-gray-100 placeholder-gray-600 rounded-xl px-4 py-2.5 text-sm ` +
+    `focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition`
+
+  /* ── Tela de sucesso ── */
+  if (enviado) {
+    return (
+      <div className="min-h-[80vh] bg-gray-950 flex items-center justify-center px-6">
+        <div className="text-center max-w-md">
+          <div className="w-24 h-24 bg-emerald-900/40 rounded-full flex items-center justify-center mx-auto mb-8">
+            <Check size={44} className="text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Finalizar Compra</h1>
+          <h2 className="text-4xl font-black text-white mb-4">Pedido enviado!</h2>
+          <p className="text-gray-400 text-lg mb-10 leading-relaxed">
+            Você foi redirecionado ao WhatsApp com todos os detalhes.
+            Nossa equipe entrará em contato em breve.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 py-4 rounded-full transition hover:scale-105"
+          >
+            Ver mais produtos
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── Formulário principal ── */
+  return (
+    <div className="min-h-screen bg-gray-950 text-gray-100 py-12">
+      <div className="max-w-5xl mx-auto px-4">
+
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-10">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-gray-400 hover:text-white transition text-sm"
+          >
+            <ArrowLeft size={18} />
+            Voltar
+          </button>
+          <div className="h-4 w-px bg-gray-700" />
+          <div>
+            <h1 className="text-2xl font-black text-white">Finalizar Pedido</h1>
+            <p className="text-gray-500 text-sm">{produto.nome}</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Informações do Cliente</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+          {/* ── Formulário (3 cols) ── */}
+          <div className="lg:col-span-3 space-y-6">
+
+            {/* Dados pessoais */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+              <h2 className="font-bold text-white text-lg mb-5">Seus dados</h2>
               <div className="space-y-4">
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nome completo <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm text-gray-400 mb-1.5">Nome completo *</label>
                   <input
-                    type="text"
-                    defaultValue={user?.name}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                    name="nome" value={form.nome} onChange={handleChange}
+                    placeholder="João da Silva"
+                    className={ic(!!errors.nome)}
                   />
+                  {errors.nome && <p className="text-red-400 text-xs mt-1">{errors.nome}</p>}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    E-mail <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    defaultValue={user?.email}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1.5">WhatsApp *</label>
+                    <input
+                      name="telefone" value={form.telefone} onChange={handleChange}
+                      placeholder="(11) 99999-9999"
+                      className={ic(!!errors.telefone)}
+                    />
+                    {errors.telefone && <p className="text-red-400 text-xs mt-1">{errors.telefone}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1.5">E-mail *</label>
+                    <input
+                      name="email" type="email" value={form.email} onChange={handleChange}
+                      placeholder="joao@email.com"
+                      className={ic(!!errors.email)}
+                    />
+                    {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Telefone <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="(11) 99999-9999"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
-                  />
-                </div>
+
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Forma de Pagamento</h2>
-              
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <button
-                  type="button"
-                  onClick={() => setFormaPagamento('cartao')}
-                  className={`p-4 border-2 rounded-lg flex flex-col items-center justify-center ${
-                    formaPagamento === 'cartao'
-                      ? 'border-[#1e40af] bg-blue-50 text-[#1e40af]'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <CreditCard className="h-6 w-6 mb-2" />
-                  <span>Cartão</span>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setFormaPagamento('pix')}
-                  className={`p-4 border-2 rounded-lg flex flex-col items-center justify-center ${
-                    formaPagamento === 'pix'
-                      ? 'border-[#1e40af] bg-blue-50 text-[#1e40af]'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <Smartphone className="h-6 w-6 mb-2" />
-                  <span>PIX</span>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setFormaPagamento('boleto')}
-                  className={`p-4 border-2 rounded-lg flex flex-col items-center justify-center ${
-                    formaPagamento === 'boleto'
-                      ? 'border-[#1e40af] bg-blue-50 text-[#1e40af]'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <Barcode className="h-6 w-6 mb-2" />
-                  <span>Boleto</span>
-                </button>
-              </div>
+            {/* Endereço */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+              <h2 className="font-bold text-white text-lg mb-5">Endereço de entrega</h2>
+              <div className="space-y-4">
 
-              {formaPagamento === 'cartao' && (
-                <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Endereço *</label>
+                  <input
+                    name="endereco" value={form.endereco} onChange={handleChange}
+                    placeholder="Av. Paulista, 1000"
+                    className={ic(!!errors.endereco)}
+                  />
+                  {errors.endereco && <p className="text-red-400 text-xs mt-1">{errors.endereco}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Complemento</label>
+                  <input
+                    name="complemento" value={form.complemento} onChange={handleChange}
+                    placeholder="Bloco A, Apto 12 (opcional)"
+                    className={ic(false)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Número do cartão <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-sm text-gray-400 mb-1.5">Cidade *</label>
                     <input
-                      type="text"
-                      placeholder="0000 0000 0000 0000"
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                      name="cidade" value={form.cidade} onChange={handleChange}
+                      placeholder="São Paulo"
+                      className={ic(!!errors.cidade)}
                     />
+                    {errors.cidade && <p className="text-red-400 text-xs mt-1">{errors.cidade}</p>}
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Validade <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="MM/AA"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        CVV <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="123"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nome no cartão <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Como está no cartão"
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parcelamento
-                    </label>
+                    <label className="block text-sm text-gray-400 mb-1.5">Estado *</label>
                     <select
-                      value={parcelas}
-                      onChange={(e) => setParcelas(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                      name="estado" value={form.estado} onChange={handleChange}
+                      className={ic(!!errors.estado)}
                     >
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => (
-                        <option key={num} value={num}>
-                          {num}x de R$ {(totalPreco / num).toFixed(2)}
-                        </option>
-                      ))}
+                      <option value="">Selecione</option>
+                      {UFS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
                     </select>
+                    {errors.estado && <p className="text-red-400 text-xs mt-1">{errors.estado}</p>}
                   </div>
                 </div>
-              )}
 
-              {formaPagamento === 'pix' && (
-                <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="mb-4">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                      <Smartphone className="h-8 w-8 text-green-600" />
-                    </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Observações</label>
+                  <textarea
+                    name="observacoes" value={form.observacoes} onChange={handleChange}
+                    rows={3} placeholder="Algum detalhe sobre o pedido? (opcional)"
+                    className={ic(false) + ' resize-none'}
+                  />
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          {/* ── Resumo (2 cols) ── */}
+          <div className="lg:col-span-2">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 sticky top-24">
+              <h2 className="font-bold text-white text-lg mb-5">Resumo do pedido</h2>
+
+              {/* Produto */}
+              <div className="flex gap-4 pb-5 mb-5 border-b border-gray-800">
+                <img
+                  src={produto.imagem}
+                  alt={produto.nome}
+                  className="w-16 h-16 object-cover rounded-xl border border-gray-700 shrink-0"
+                />
+                <div>
+                  <p className="font-bold text-white text-sm leading-snug">{produto.nome}</p>
+                  <p className="text-gray-500 text-xs mt-1 leading-relaxed line-clamp-2">{produto.descricao}</p>
+                </div>
+              </div>
+
+              {/* Cor */}
+              {produto.cores.length > 1 && (
+                <div className="mb-5">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Cor</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {produto.cores.map(cor => (
+                      <button
+                        key={cor.hex}
+                        type="button"
+                        onClick={() => setForm(p => ({ ...p, corSelecionada: cor.hex }))}
+                        title={cor.nome}
+                        className={`w-8 h-8 rounded-full border-2 transition ${
+                          form.corSelecionada === cor.hex
+                            ? 'border-blue-400 scale-110'
+                            : 'border-gray-700 hover:border-gray-500'
+                        }`}
+                        style={{ backgroundColor: cor.hex }}
+                      />
+                    ))}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Pagamento Instantâneo</h3>
-                  <p className="text-gray-700 mb-4">
-                    Após confirmar o pedido, você receberá um QR Code para pagamento via PIX.
-                    O pedido será confirmado automaticamente após o pagamento.
+                  <p className="text-xs text-gray-600 mt-1.5">
+                    {produto.cores.find(c => c.hex === form.corSelecionada)?.nome}
                   </p>
-                  <div className="bg-white p-4 rounded-lg border border-gray-300 inline-block">
-                    <div className="w-48 h-48 bg-gray-100 rounded flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="w-32 h-32 bg-white mx-auto mb-2 rounded border-2 border-dashed border-gray-300 flex items-center justify-center">
-                          <span className="text-gray-400 text-sm">QR Code</span>
-                        </div>
-                        <p className="text-xs text-gray-500">Escaneie com seu app de pagamentos</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
-              {formaPagamento === 'boleto' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parcelamento
-                    </label>
-                    <select
-                      value={parcelas}
-                      onChange={(e) => setParcelas(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
-                    >
-                      {[1, 2, 3, 4, 5, 6].map(num => (
-                        <option key={num} value={num}>
-                          {num}x {num > 1 ? `(acréscimo de ${((num - 1) * 2.5).toFixed(1)}%)` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  {parcelas > 1 && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <div className="flex items-start">
-                        <MessageCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
-                        <div>
-                          <p className="text-yellow-800 font-medium mb-1">
-                            Para boleto parcelado, finalize seu pedido via WhatsApp
-                          </p>
-                          <p className="text-yellow-700 text-sm">
-                            Nossa equipe entrará em contato para enviar os boletos e finalizar o pedido.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-800 text-sm">
-                      <span className="font-medium">Prazo de entrega:</span> O boleto pode levar até 2 dias úteis para compensar. 
-                      A entrega será agendada após a confirmação do pagamento.
-                    </p>
-                  </div>
+              {/* Quantidade */}
+              <div className="mb-6">
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Quantidade</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, quantidade: Math.max(1, p.quantidade - 1) }))}
+                    className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300 transition"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="text-xl font-black text-white w-6 text-center">{form.quantidade}</span>
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, quantidade: p.quantidade + 1 }))}
+                    className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300 transition"
+                  >
+                    <Plus size={14} />
+                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* Totais */}
+              <div className="border-t border-gray-800 pt-4 mb-6 space-y-2">
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Subtotal</span>
+                  <span>R$ {totalPreco.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Frete</span>
+                  <span className="text-emerald-400">A combinar</span>
+                </div>
+                <div className="flex justify-between text-lg font-black text-white pt-2 border-t border-gray-800">
+                  <span>Total</span>
+                  <span className="text-blue-400">R$ {totalPreco.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <button
+                type="button"
+                onClick={handleEnviar}
+                className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black py-4 rounded-xl transition text-base"
+              >
+                <MessageCircle size={20} />
+                Enviar pelo WhatsApp
+              </button>
+
+              <p className="text-xs text-gray-600 text-center mt-3">
+                Abriremos o WhatsApp com todos os detalhes preenchidos
+              </p>
+
+              <div className="mt-5 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <ShieldCheck size={13} className="text-emerald-600 shrink-0" />
+                  Garantia de 12 meses em todos os produtos
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <Lock size={13} className="text-blue-600 shrink-0" />
+                  Atendimento direto com nossa equipe
+                </div>
+              </div>
+
             </div>
           </div>
 
-          <div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-24">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Resumo do Pedido</h2>
-              
-              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto pr-2">
-                {carrinho.map((item) => (
-                  <div key={`${item.produto.id}-${item.corSelecionada}`} className="flex justify-between items-start py-3 border-b border-gray-200">
-                    <div>
-                      <p className="font-medium text-gray-900">{item.produto.nome}</p>
-                      <p className="text-sm text-gray-500">
-                        {item.quantidade}x {item.corSelecionada && `• Cor: ${item.corSelecionada}`}
-                      </p>
-                    </div>
-                    <p className="font-medium text-gray-900">R$ {(item.produto.preco * item.quantidade).toFixed(2)}</p>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="border-t border-gray-200 pt-4 space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">R$ {totalPreco.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Frete</span>
-                  <span className="font-medium text-green-600">Grátis</span>
-                </div>
-                {formaPagamento === 'boleto' && parcelas > 1 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Juros ({parcelas}x)</span>
-                    <span className="font-medium">R$ {((totalPreco * 0.025 * (parcelas - 1)).toFixed(2))}</span>
-                  </div>
-                )}
-                <div className="border-t border-gray-200 pt-3">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-[#1e40af]">
-                      R$ {formaPagamento === 'boleto' && parcelas > 1 
-                        ? (totalPreco + (totalPreco * 0.025 * (parcelas - 1))).toFixed(2)
-                        : totalPreco.toFixed(2)
-                      }
-                    </span>
-                  </div>
-                  {formaPagamento === 'cartao' && parcelas > 1 && (
-                    <p className="text-sm text-gray-500 text-right mt-1">
-                      em {parcelas}x de R$ {(totalPreco / parcelas).toFixed(2)}
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="mt-8 space-y-4">
-                <div className="flex items-center text-gray-600 bg-gray-50 p-3 rounded-lg">
-                  <Lock className="h-4 w-4 mr-2 text-green-500" />
-                  <span className="text-sm">Pagamento 100% seguro - SSL criptografado</span>
-                </div>
-                
-                <div className="flex items-center text-gray-600 bg-gray-50 p-3 rounded-lg">
-                  <Shield className="h-4 w-4 mr-2 text-blue-500" />
-                  <span className="text-sm">Garantia de 12 meses em todos os produtos</span>
-                </div>
-                
-                <button
-                  type="button"
-                  onClick={handleFinalizarPedido}
-                  disabled={loading}
-                  className="w-full bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-bold py-3 px-4 rounded-lg disabled:opacity-50 flex items-center justify-center"
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Processando...
-                    </>
-                  ) : formaPagamento === 'boleto' && parcelas > 1 ? (
-                    <>
-                      <MessageCircle className="h-5 w-5 mr-2" />
-                      Finalizar via WhatsApp
-                    </>
-                  ) : (
-                    'Confirmar Pedido'
-                  )}
-                </button>
-                
-                <p className="text-xs text-gray-500 text-center">
-                  Ao finalizar o pedido, você concorda com nossos 
-                  <a href="#" className="text-[#1e40af] hover:text-[#1e3a8a] ml-1">Termos de Serviço</a> e 
-                  <a href="#" className="text-[#1e40af] hover:text-[#1e3a8a] ml-1">Política de Privacidade</a>
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
-  );
+  )
 }

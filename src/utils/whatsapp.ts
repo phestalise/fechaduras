@@ -1,5 +1,5 @@
 // Substitua pelo seu número em formato internacional sem +, ex: 5511999999999
-export const WHATSAPP_NUMBER = '5541999999999'
+export const WHATSAPP_NUMBER = '5511995778307'
 
 
 export function makeWhatsAppUrl(message: string) {
